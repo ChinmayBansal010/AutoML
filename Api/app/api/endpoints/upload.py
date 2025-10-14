@@ -11,13 +11,7 @@ async def upload_file(
 ):
     """
     Accepts an Excel (.xlsx, .xls) or CSV (.csv) file upload.
-
-    - **Saves** the file to a unique server-side location.
-    - **Validates** the file type.
-    - **Reads** the file to provide an initial summary (columns, row count, data sample).
-    - **Returns** a unique `file_id` for referencing the dataset in subsequent API calls.
     """
-    # Validate that the uploaded file has an accepted extension
     if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
         raise HTTPException(
             status_code=400,
@@ -25,9 +19,7 @@ async def upload_file(
         )
 
     try:
-        # Delegate the core logic of saving and summarizing to the FileService
         summary = await file_service.save_and_summarize_file(file)
         return summary
     except Exception as e:
-        # Provide a generic but informative error response if file processing fails
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
