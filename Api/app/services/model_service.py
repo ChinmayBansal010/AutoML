@@ -1,7 +1,6 @@
 import os
 import uuid
 import joblib
-import zipfile
 import pandas as pd
 import shutil
 from fastapi import UploadFile, BackgroundTasks, Depends
@@ -61,11 +60,11 @@ class ModelService:
             
             temp_dirs = []
 
-            # --- NEW: Loop through all requested models ---
+            # --- Loop through all requested models ---
             for i, model_name in enumerate(request.models_to_train):
                 progress_message = f"({i+1}/{len(request.models_to_train)}) Training {model_name}..."
                 self.task_store[task_id].progress = progress_message
-                print(progress_message) # Also print to server console
+                print(progress_message)
 
                 temp_model_dir = os.path.join(settings.MODELS_DIR, "temp", str(uuid.uuid4()))
                 os.makedirs(temp_model_dir, exist_ok=True)
@@ -81,10 +80,11 @@ class ModelService:
                     hyperparameter_tuning=request.hyperparameter_tuning
                 )
 
-                current_accuracy = current_results["metrics"]["accuracy"]
+                # CORRECTED KEY ACCESS: Use the new nested key for accuracy
+                current_accuracy = current_results["metrics"]["overall_metrics"]["accuracy"]
                 print(f"Finished training {model_name} with accuracy: {current_accuracy:.4f}")
 
-                # --- NEW: Compare with the best model so far ---
+                # --- Compare with the best model so far ---
                 if current_accuracy > best_accuracy:
                     print(f"New best model found: {model_name} (Accuracy: {current_accuracy:.4f})")
                     best_accuracy = current_accuracy
@@ -95,7 +95,7 @@ class ModelService:
             if not best_model_results:
                 raise RuntimeError("No models were trained successfully.")
 
-            # --- NEW: Finalize and save ONLY the best model ---
+            # --- Finalize and save ONLY the best model ---
             self.task_store[task_id].progress = f"Saving best model ({best_model_name}) with accuracy: {best_accuracy:.4f}"
             
             model_id = str(uuid.uuid4())
@@ -110,19 +110,38 @@ class ModelService:
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
 
+            # --- FIX: Flatten metrics and build the final result dictionary ---
+            overall_metrics = best_model_results["metrics"]["overall_metrics"]
+            
+            # 1. Map top-level metrics to the flat names required by the ModelMetrics schema
+            flattened_metrics_for_schema = {
+                "accuracy": overall_metrics["accuracy"],
+                "precision": overall_metrics["weighted_precision"],
+                "recall": overall_metrics["weighted_recall"],
+                "f1_score": overall_metrics["weighted_f1_score"],
+                "confusion_matrix": best_model_results["metrics"]["confusion_matrix"]
+            }
+
+            # 2. Create ModelMetrics object (required for validation)
             final_metrics = ModelMetrics(
                 model_id=model_id,
                 model_name=best_model_name,
                 file_id=file_id,
-                **best_model_results["metrics"],
+                **flattened_metrics_for_schema,
                 report_url=f"/api/model/report/{model_id}"
             )
+            
+            # 3. Create the FINAL result dictionary for StatusResponse
+            # This combines the validated metrics with the new detailed report data.
+            final_result_dict = final_metrics.dict()
+            final_result_dict["plots"] = best_model_results["plots"]
+            final_result_dict["details"] = best_model_results["details"]
             
             self.task_store[task_id] = StatusResponse(
                 task_id=task_id,
                 status="complete",
                 progress="Training finished successfully. Best model saved.",
-                result=final_metrics
+                result=final_result_dict # Assign the flattened, enhanced dictionary
             )
 
         except Exception as e:
@@ -136,4 +155,3 @@ class ModelService:
                 progress=f"Error: {str(e)}",
                 result=None
             )
-
