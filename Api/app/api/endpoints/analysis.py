@@ -4,19 +4,27 @@ from app.services.analysis_service import AnalysisService
 
 router = APIRouter()
 
-@router.post("", response_model=AnalysisResponse)
-async def perform_analysis(
-    request: AnalysisRequest,
-    analysis_service: AnalysisService = Depends()
+@router.get("/preview/{file_id}")
+def get_data_preview(
+    file_id: str,
+    service: AnalysisService = Depends()
 ):
-    """
-    Performs preliminary data analysis (e.g., column distribution, correlations) 
-    on an uploaded file.
-    """
     try:
-        analysis_result = analysis_service.run_analysis(request.file_id)
-        return analysis_result
+        return service.get_data_preview(file_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/eda/{file_id}", response_model=AnalysisResponse)
+def generate_eda(
+    file_id: str,
+    service: AnalysisService = Depends()
+):
+    try:
+        return service.generate_eda_report(file_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -1,3 +1,4 @@
+import 'package:automl/screens/dashboard_screen.dart';
 import 'package:automl/screens/job/job_creation/step1_upload_data.dart';
 import 'package:automl/screens/job/job_creation/step2_data_preview.dart';
 import 'package:automl/widgets/common_app_bar.dart';
@@ -31,7 +32,11 @@ class _JobCreationScreenState extends State<JobCreationScreen> {
   }
 
   void _submitJob() {
-    Navigator.of(context).pop();
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      DashboardScreen.routeName,
+          (route) => false,
+    );
   }
 
   @override
