@@ -1,45 +1,82 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:automl/core/firebase_setup.dart';
+import 'package:flutter/material.dart';
 import 'package:automl/screens/auth/auth_wrapper.dart';
 import 'package:automl/screens/auth/login_screen.dart';
 import 'package:automl/screens/auth/signup_screen.dart';
-import 'package:automl/screens/job/dashboard_screen.dart';
-import 'package:automl/screens/job/upload_screen.dart';
-import 'package:automl/screens/job/jobs_list_screen.dart';
+import 'package:automl/screens/dashboard_screen.dart';
+// 1. Import the new screen
+import 'package:automl/screens/job/job_creation/job_creation_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await initializeFirebase();
-  } on FirebaseException {
-  }
-  runApp(const AutoMLApp());
+  await initializeFirebase();
+  runApp(const MyApp());
 }
 
-class AutoMLApp extends StatelessWidget {
-  const AutoMLApp({super.key});
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  static MyAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<MyAppState>()!;
+
+  @override
+  State<MyApp> createState() => MyAppState();
+}
+
+class MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  void toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AutoML Dashboard',
-      debugShowCheckedModeBanner: false,
+      title: 'AutoML App',
+      themeMode: _themeMode,
       theme: ThemeData(
+        brightness: Brightness.light,
         primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        fontFamily: 'Inter',
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.grey[50],
+        scaffoldBackgroundColor: Colors.transparent,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          titleTextStyle: TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(color: Colors.black),
+        ),
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.transparent,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
+      ),
+      debugShowCheckedModeBanner: false,
+      initialRoute: AuthWrapper.routeName,
       routes: {
+        AuthWrapper.routeName: (context) => const AuthWrapper(),
         LoginScreen.routeName: (context) => const LoginScreen(),
         SignupScreen.routeName: (context) => const SignupScreen(),
         DashboardScreen.routeName: (context) => const DashboardScreen(),
-        UploadScreen.routeName: (context) => const UploadScreen(),
-        JobsListScreen.routeName: (context) => const JobsListScreen(),
+        JobCreationScreen.routeName: (context) => const JobCreationScreen(),
       },
-      home: const AuthWrapper(),
     );
   }
 }

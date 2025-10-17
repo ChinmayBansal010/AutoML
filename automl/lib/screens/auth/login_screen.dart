@@ -1,4 +1,4 @@
-import 'package:automl/screens/job/dashboard_screen.dart';
+import 'package:automl/screens/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:automl/core/firebase_setup.dart';
 import 'package:automl/screens/auth/signup_screen.dart';

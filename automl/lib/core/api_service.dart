@@ -1,71 +1,47 @@
 import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:automl/data/models/upload_summary.dart';
-import 'package:automl/data/models/job_models.dart';
-import 'dart:io';
+import 'package:automl/utils/snackbar_helper.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String _baseUrl = 'http://127.0.0.1:8000';
 
-  Future<UploadSummary> uploadFile(String filePath, String fileName) async {
-    final uri = Uri.parse('$baseUrl/upload');
-    final request = http.MultipartRequest('POST', uri);
-
-    final file = await http.MultipartFile.fromPath(
-      'file',
-      filePath,
-      filename: fileName,
-    );
-
-    request.files.add(file);
-
+  Future<Map<String, dynamic>?> uploadFile(PlatformFile file, BuildContext context) async {
     try {
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final uri = Uri.parse('$_baseUrl/api/upload/');
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(http.MultipartFile.fromBytes('file', file.bytes!, filename: file.name));
+
+      final response = await http.Response.fromStream(await request.send());
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
-        return UploadSummary.fromJson(data);
+        showCustomSnackbar(context, 'File uploaded successfully.');
+        return json.decode(response.body); // This will contain the 'file_id'
       } else {
-        throw Exception('API Error (${response.statusCode}): ${response.body}');
+        showCustomSnackbar(context, 'File upload failed: ${response.body}', isError: true);
+        return null;
       }
     } catch (e) {
-      throw Exception('Network or processing error: $e');
+      showCustomSnackbar(context, 'An error occurred during upload: $e', isError: true);
+      return null;
     }
   }
 
-  Future<StatusResponse> startTrainingJob(TrainingRequest request) async {
-    final uri = Uri.parse('$baseUrl/model/train');
-    final headers = {'Content-Type': 'application/json'};
-    final body = json.encode(request.toJson());
-
+  Future<Map<String, dynamic>?> getDataPreview(String fileId, BuildContext context) async {
     try {
-      final response = await http.post(uri, headers: headers, body: body);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
-        return StatusResponse.fromJson(data);
-      } else {
-        throw Exception('API Error (${response.statusCode}): ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Network Error: $e');
-    }
-  }
-
-  Future<StatusResponse> getJobStatus(String taskId) async {
-    final uri = Uri.parse('$baseUrl/model/status/$taskId');
-    try {
+      final uri = Uri.parse('$_baseUrl/api/analysis/preview/$fileId');
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
-        return StatusResponse.fromJson(data);
+        return json.decode(response.body);
       } else {
-        throw Exception('API Error (${response.statusCode}): ${response.body}');
+        showCustomSnackbar(context, 'Failed to load data preview: ${response.body}', isError: true);
+        return null;
       }
     } catch (e) {
-      throw Exception('Network Error: $e');
+      showCustomSnackbar(context, 'An error occurred fetching preview: $e', isError: true);
+      return null;
     }
   }
 }
