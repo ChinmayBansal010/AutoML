@@ -160,4 +160,4 @@ Contributions are welcome! If you have suggestions or find bugs, please open an 
 
 ## 📄 License
 
-Distributed under the **MIT License**. See the repository's `LICENSE` file for more information.
+Distributed under the **MIT License**. See the repository's [`LICENSE`](https://github.com/ChinmayBansal010/AutoML/blob/main/LICENSE) file for more information.
