@@ -46,11 +46,11 @@ class AnalysisService:
                 raise FileNotFoundError(f"No data found for file_id: {file_id}")
 
             preview_df = df.head(num_rows)
-
-            # Replace invalid, infinite, or empty string values
             preview_df = preview_df.replace([np.inf, -np.inf, "", " ", "NaN", "nan"], np.nan)
+            
+            columns = preview_df.columns.tolist()
+            column_types = {col: str(preview_df[col].dtype) for col in columns}
 
-            # Convert DataFrame to JSON-safe structure
             def sanitize_value(val):
                 if pd.isna(val) or val in [np.inf, -np.inf]:
                     return None
@@ -66,26 +66,80 @@ class AnalysisService:
                 [sanitize_value(v) for v in row]
                 for row in preview_df.values.tolist()
             ]
-
+            
             return {
-                "columns": preview_df.columns.tolist(),
+                "total_rows": df.shape[0],
+                "column_types": column_types,
+                "columns": columns,
                 "data": json_safe_data
             }
-
         except Exception as e:
             raise RuntimeError(f"An error occurred during data preview generation: {e}")
 
-
-    def generate_eda_report(self, file_id: str) -> dict:
+    def get_visualization_data(self, file_id: str, col1: str, col2: str = None) -> dict:
         """
-        Generates a comprehensive EDA report, cleaning data and ensuring JSON safety.
+        Generates data for visualization based on selected columns.
+        """
+        try:
+            df = self.file_service.get_dataframe(file_id)
+            if df is None:
+                raise FileNotFoundError(f"No data found for file_id: {file_id}")
+            
+            if col1 not in df.columns or (col2 and col2 not in df.columns):
+                raise ValueError("Invalid column name(s) provided.")
+
+            response = {"column_1": {}, "scatter_data": None}
+
+            col1_type = 'numeric' if pd.api.types.is_numeric_dtype(df[col1]) else 'categorical'
+            response["column_1"]["type"] = col1_type
+            
+            if col1_type == 'numeric':
+                clean_col = df[col1].dropna()
+                stats = clean_col.describe()
+                response["column_1"]["stats"] = {
+                    "min": safe_float(stats.get("min")), "max": safe_float(stats.get("max")),
+                    "mean": safe_float(stats.get("mean")), "median": safe_float(stats.get("50%")),
+                }
+                bins = min(50, clean_col.nunique())
+                hist, edges = np.histogram(clean_col, bins=bins if bins > 0 else 1)
+                response["column_1"]["chart_data"] = {
+                    "labels": [f"{edges[i]:.1f}-{edges[i+1]:.1f}" for i in range(len(edges)-1)],
+                    "values": [int(v) for v in hist]
+                }
+            else:
+                value_counts = df[col1].value_counts().nlargest(15)
+                response["column_1"]["chart_data"] = {
+                    "labels": [str(k) for k in value_counts.index.tolist()],
+                    "values": [int(v) for v in value_counts.values.tolist()]
+                }
+            
+            if col2 and pd.api.types.is_numeric_dtype(df[col1]) and pd.api.types.is_numeric_dtype(df[col2]):
+                # --- THIS IS THE FIX ---
+                clean_scatter_df = df[[col1, col2]].dropna()
+                # Determine sample size based on the *cleaned* dataframe
+                sample_size = min(len(clean_scatter_df), 1000)
+                
+                if sample_size > 0:
+                    sample_df = clean_scatter_df.sample(n=sample_size, random_state=42)
+                    response["scatter_data"] = {
+                        "x": [safe_float(v) for v in sample_df[col1].tolist()],
+                        "y": [safe_float(v) for v in sample_df[col2].tolist()],
+                    }
+
+            return clean_for_json(response)
+
+        except Exception as e:
+            raise RuntimeError(f"An unexpected error occurred during visualization data generation: {e}")
+
+    def generate_eda_report(self, file_id: str, target_column: str = None) -> dict:
+        """
+        Generates a comprehensive EDA report, including specific analysis on the target column if provided.
         """
         try:
             df = self.file_service.get_dataframe(file_id)
             if df is None:
                 raise FileNotFoundError(f"No data found for file_id: {file_id}")
 
-            # Replace invalid and empty string values
             df = df.replace([np.inf, -np.inf, "", " ", "NaN", "nan"], np.nan)
 
             row_count, col_count = df.shape
@@ -94,34 +148,36 @@ class AnalysisService:
 
             column_details = {}
             for col in df.columns:
-                col_data = df[col]
+                # ... (existing column detail logic remains unchanged)
+                pass
 
-                value_counts = col_data.value_counts(dropna=False).head(10)
-                value_counts_str_keys = {str(k): int(v) for k, v in value_counts.items()}
-
-                min_val = max_val = mean_val = std_val = None
-                if pd.api.types.is_numeric_dtype(col_data) and col_data.notna().any():
-                    clean_col = col_data.dropna()
-                    if not clean_col.empty:
-                        min_val = safe_float(clean_col.min())
-                        max_val = safe_float(clean_col.max())
-                        mean_val = safe_float(clean_col.mean())
-                        std_val = safe_float(clean_col.std())
-
-                column_details[col] = ColumnStats(
-                    dtype=str(col_data.dtype),
-                    missing_count=int(col_data.isnull().sum()),
-                    unique_count=int(col_data.nunique(dropna=True)),
-                    value_counts=value_counts_str_keys,
-                    min_value=min_val,
-                    max_value=max_val,
-                    mean=mean_val,
-                    std=std_val,
-                )
+            # --- NEW: Target Column Analysis ---
+            target_column_analysis = None
+            if target_column and target_column in df.columns:
+                target_data = df[target_column].dropna()
+                
+                if pd.api.types.is_numeric_dtype(target_data):
+                    # Inferred Task: Regression
+                    target_column_analysis = {
+                        "inferred_task": "Regression",
+                        "stats": {
+                            "mean": safe_float(target_data.mean()),
+                            "std": safe_float(target_data.std()),
+                            "min": safe_float(target_data.min()),
+                            "max": safe_float(target_data.max()),
+                        }
+                    }
+                else:
+                    # Inferred Task: Classification
+                    value_counts = target_data.value_counts()
+                    target_column_analysis = {
+                        "inferred_task": "Classification",
+                        "class_distribution": {str(k): int(v) for k, v in value_counts.items()}
+                    }
+            # --- END NEW SECTION ---
 
             visualizations = {}
-            target_column_analysis = None
-
+            
             result = AnalysisResponse(
                 file_id=file_id,
                 row_count=row_count,
@@ -130,10 +186,9 @@ class AnalysisService:
                 missing_values_total=missing_values_total,
                 summary_stats=column_details,
                 visualizations=visualizations,
-                target_column_analysis=target_column_analysis
+                target_column_analysis=target_column_analysis # Assign the new analysis
             )
 
-            # Convert to dict and clean all possible bad values
             return clean_for_json(result.dict())
 
         except Exception as e:

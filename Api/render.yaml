@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: automl-api
+    runtime: docker
+    repo: https://github.com/ChinmayBansal010/AutoML
+    region: singapore
+    plan: free
+    dockerfilePath: ./Api/Dockerfile
+    healthCheckPath: /
+
+    envVars:
+      - key: STORAGE_DIR
+        value: /var/data/automl_storage
+
+    # Disks go **outside** of envVars and are directly nested under the service
+    disk:
+      name: automl-storage
+      mountPath: /var/data/automl_storage
+      sizeGB: 1
+      

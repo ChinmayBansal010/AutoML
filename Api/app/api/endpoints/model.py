@@ -1,30 +1,26 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from app.schemas.model import TrainingRequest, StatusResponse, ModelMetrics
+from fastapi.responses import FileResponse
+from app.schemas.model import TrainingRequest, StatusResponse, TaskResponse, PredictionRequest
 from app.services.model_service import ModelService
+from app.core.config import settings
 import os
-import shutil
 
 router = APIRouter()
 
-@router.post("/train", response_model=StatusResponse)
+@router.post("/train", response_model=TaskResponse)
 async def train_model(
     request: TrainingRequest,
     background_tasks: BackgroundTasks,
     model_service: ModelService = Depends()
 ):
     """
-    Starts the asynchronous training job for the best model selection.
+    Starts the asynchronous training job for the selected models.
     """
     try:
-        task_id = model_service.start_training_job(
-            request.file_id, 
-            request, 
-            background_tasks
-        )
-        return StatusResponse(
+        task_id = model_service.start_training_job(request, background_tasks)
+        return TaskResponse(
             task_id=task_id, 
-            status="queued", 
-            progress=f"Training job started with ID: {task_id}"
+            status="queued"
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -44,28 +40,33 @@ async def get_training_status(
     return status
 
 
-@router.get("/metrics/{model_id}", response_model=ModelMetrics)
-async def get_model_metrics(
-    model_id: str,
-    model_service: ModelService = Depends()
-):
+@router.get("/download/{model_id}")
+async def download_model(model_id: str):
     """
-    Retrieves the stored metrics for a completed model.
-    NOTE: This endpoint is currently not used, as metrics are returned via /status.
+    Allows downloading of a trained model file.
     """
-    raise HTTPException(status_code=501, detail="This endpoint is deprecated. Use /status/{task_id} instead.")
+    try:
+        model_path = settings.MODELS_DIR / f"{model_id}.joblib"
+        if not os.path.exists(model_path):
+            raise HTTPException(status_code=404, detail="Model file not found.")
+        return FileResponse(path=model_path, filename=f"{model_id}.joblib", media_type='application/octet-stream')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/report/{model_id}")
-async def get_model_report(
-    model_id: str
+
+@router.post("/predict")
+async def predict(
+    request: PredictionRequest,
+    service: ModelService = Depends()
 ):
     """
-    Serves the HTML report for a trained model.
-    NOTE: Report generation is currently done client-side. This is a placeholder.
+    Makes a prediction using a trained model.
     """
-    report_path = os.path.join("REPORTS_DIR", f"{model_id}.html")
-    if not os.path.exists(report_path):
-        raise HTTPException(status_code=404, detail="Report not found. The client is expected to generate the report from the status response data.")
-    
-    # In a fully functional system, we would return a FileResponse here.
-    return {"message": "Report generation is handled by the client."}
+    try:
+        prediction = service.predict(request)
+        return {"prediction": prediction}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -3,155 +3,93 @@ import uuid
 import joblib
 import pandas as pd
 import shutil
-from fastapi import UploadFile, BackgroundTasks, Depends
+import json
+import traceback
+from fastapi import BackgroundTasks, Depends
+from pathlib import Path
 
 from app.core.config import settings
-from app.schemas.model import TrainingRequest, StatusResponse, ModelMetrics
+from app.schemas.model import TrainingRequest, StatusResponse, ModelResult
 from app.pipelines.training_pipeline import run_training_pipeline
 from app.services.file_service import FileService
-
-# This dictionary will act as our in-memory "database" for task statuses.
-TASK_STATUS_STORE = {}
 
 class ModelService:
     def __init__(self, file_service: FileService = Depends(FileService)):
         self.file_service = file_service
-        self.task_store = TASK_STATUS_STORE
 
-    def start_training_job(
-        self, file_id: str, request: TrainingRequest, background_tasks: BackgroundTasks
-    ) -> str:
-        """Adds the training process to background tasks."""
+    def start_training_job(self, request: TrainingRequest, background_tasks: BackgroundTasks) -> str:
         task_id = str(uuid.uuid4())
+        status_file = settings.TASK_STATUS_DIR / f"{task_id}.json"
         
-        self.task_store[task_id] = StatusResponse(
+        initial_status = StatusResponse(
             task_id=task_id,
-            status="starting",
+            status="queued",
             progress="Training job has been queued."
         )
+        with open(status_file, 'w') as f:
+            json.dump(initial_status.dict(), f, indent=4)
 
-        background_tasks.add_task(
-            self._run_training_in_background, task_id, file_id, request
-        )
+        background_tasks.add_task(self._run_training_in_background, task_id, request)
         return task_id
 
-    def get_job_status(self, task_id: str) -> StatusResponse | None:
-        """Retrieves the status of a training job."""
-        return self.task_store.get(task_id)
+    def get_job_status(self, task_id: str) -> dict:
+        status_file = settings.TASK_STATUS_DIR / f"{task_id}.json"
+        if not status_file.exists():
+            return StatusResponse(task_id=task_id, status="not_found", error="Task ID not found.").dict()
+        with open(status_file, 'r') as f:
+            return json.load(f)
 
-    def _run_training_in_background(self, task_id: str, file_id: str, request: TrainingRequest):
-        """
-        The actual training logic that runs in the background.
-        - Trains all requested models.
-        - Optionally performs hyperparameter tuning.
-        - Compares models based on accuracy and saves only the best one.
-        """
+    def _run_training_in_background(self, task_id: str, request: TrainingRequest):
+        status_file = settings.TASK_STATUS_DIR / f"{task_id}.json"
+
+        def update_status(status: str, progress: str = None, results: dict = None, error: str = None):
+            with open(status_file, 'r+') as f:
+                data = json.load(f)
+                data['status'] = status
+                if progress: data['progress'] = progress
+                if results: data['results'] = results
+                if error: data['error'] = error
+                f.seek(0)
+                json.dump(data, f, indent=4)
+                f.truncate()
+
         try:
-            self.task_store[task_id].status = "running"
-            self.task_store[task_id].progress = "Loading data..."
-            
-            df = self.file_service.get_dataframe(file_id)
+            update_status("running", progress="Loading data...")
+            df = self.file_service.get_dataframe(request.file_id)
             if df is None:
-                raise FileNotFoundError("Could not load dataframe for training.")
+                raise FileNotFoundError(f"Could not load dataframe for file_id: {request.file_id}")
 
-            best_model_results = None
-            best_model_name = None
-            best_accuracy = -1.0
+            all_results = {}
+            total_models = len(request.models)
             
-            temp_dirs = []
-
-            # --- Loop through all requested models ---
-            for i, model_name in enumerate(request.models_to_train):
-                progress_message = f"({i+1}/{len(request.models_to_train)}) Training {model_name}..."
-                self.task_store[task_id].progress = progress_message
-                print(progress_message)
-
-                temp_model_dir = os.path.join(settings.MODELS_DIR, "temp", str(uuid.uuid4()))
-                os.makedirs(temp_model_dir, exist_ok=True)
-                temp_dirs.append(temp_model_dir)
+            for i, model_name in enumerate(request.models):
+                progress_message = f"({i+1}/{total_models}) Training {model_name}..."
+                update_status("running", progress=progress_message)
                 
-                current_results = run_training_pipeline(
-                    df=df,
+                # The pipeline now returns a perfectly clean dictionary
+                pipeline_result = run_training_pipeline(
+                    df=df.copy(),
                     target_column=request.target_column,
                     model_name=model_name,
                     preprocessing_config=request.preprocessing_config,
-                    test_size=settings.DEFAULT_TEST_SIZE,
-                    plots_dir=temp_model_dir,
+                    test_size=request.test_size,
+                    plots_dir=str(settings.REPORTS_DIR),
                     hyperparameter_tuning=request.hyperparameter_tuning
                 )
+                
+                model_object = pipeline_result.pop("model") # Remove model object before serialization
+                model_id = f"{task_id}_{model_name}"
+                model_path = settings.MODELS_DIR / f"{model_id}.joblib"
+                joblib.dump(model_object, model_path)
+                
+                # The rest of the pipeline_result is already a clean dict
+                model_result_obj = ModelResult(model_id=model_id, **pipeline_result)
+                all_results[model_name] = model_result_obj.dict()
 
-                # CORRECTED KEY ACCESS: Use the new nested key for accuracy
-                current_accuracy = current_results["metrics"]["overall_metrics"]["accuracy"]
-                print(f"Finished training {model_name} with accuracy: {current_accuracy:.4f}")
-
-                # --- Compare with the best model so far ---
-                if current_accuracy > best_accuracy:
-                    print(f"New best model found: {model_name} (Accuracy: {current_accuracy:.4f})")
-                    best_accuracy = current_accuracy
-                    best_model_results = current_results
-                    best_model_name = model_name
-                    best_model_results["temp_dir"] = temp_model_dir
-
-            if not best_model_results:
-                raise RuntimeError("No models were trained successfully.")
-
-            # --- Finalize and save ONLY the best model ---
-            self.task_store[task_id].progress = f"Saving best model ({best_model_name}) with accuracy: {best_accuracy:.4f}"
-            
-            model_id = str(uuid.uuid4())
-            final_model_dir = os.path.join(settings.MODELS_DIR, model_id)
-            
-            # Move the best model's directory to its final location
-            shutil.move(best_model_results["temp_dir"], final_model_dir)
-            joblib.dump(best_model_results["model"], os.path.join(final_model_dir, "model.joblib"))
-
-            # Clean up other temporary directories
-            for temp_dir in temp_dirs:
-                if os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir)
-
-            # --- FIX: Flatten metrics and build the final result dictionary ---
-            overall_metrics = best_model_results["metrics"]["overall_metrics"]
-            
-            # 1. Map top-level metrics to the flat names required by the ModelMetrics schema
-            flattened_metrics_for_schema = {
-                "accuracy": overall_metrics["accuracy"],
-                "precision": overall_metrics["weighted_precision"],
-                "recall": overall_metrics["weighted_recall"],
-                "f1_score": overall_metrics["weighted_f1_score"],
-                "confusion_matrix": best_model_results["metrics"]["confusion_matrix"]
-            }
-
-            # 2. Create ModelMetrics object (required for validation)
-            final_metrics = ModelMetrics(
-                model_id=model_id,
-                model_name=best_model_name,
-                file_id=file_id,
-                **flattened_metrics_for_schema,
-                report_url=f"/api/model/report/{model_id}"
-            )
-            
-            # 3. Create the FINAL result dictionary for StatusResponse
-            # This combines the validated metrics with the new detailed report data.
-            final_result_dict = final_metrics.dict()
-            final_result_dict["plots"] = best_model_results["plots"]
-            final_result_dict["details"] = best_model_results["details"]
-            
-            self.task_store[task_id] = StatusResponse(
-                task_id=task_id,
-                status="complete",
-                progress="Training finished successfully. Best model saved.",
-                result=final_result_dict # Assign the flattened, enhanced dictionary
-            )
+            update_status("completed", progress="All models trained successfully.", results=all_results)
 
         except Exception as e:
-            import traceback
             error_details = traceback.format_exc()
             print(f"TRAINING FAILED for task {task_id}:\n{error_details}")
-            
-            self.task_store[task_id] = StatusResponse(
-                task_id=task_id,
-                status="failed",
-                progress=f"Error: {str(e)}",
-                result=None
-            )
+            update_status("failed", progress=f"Error: {str(e)}", error=str(e))
+

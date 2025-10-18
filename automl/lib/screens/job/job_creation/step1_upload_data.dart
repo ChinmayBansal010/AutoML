@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:automl/core/api_service.dart'; // Make sure this import is correct
 
 class UploadDataStep extends StatefulWidget {
-  // This callback must accept the file path string to trigger the next page
   final Function(String) onContinue;
 
   const UploadDataStep({super.key, required this.onContinue});
@@ -67,117 +66,121 @@ class _UploadDataStepState extends State<UploadDataStep> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 30),
-          // This is your UI, now self-contained and correct
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(32.0),
-            decoration: BoxDecoration(
-              color: isDarkMode ? Colors.grey.shade900.withOpacity(0.5) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
-                style: BorderStyle.solid, // Changed to solid as per your code
-                width: 2,
-              ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 600,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6A11CB).withOpacity(0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.cloud_upload_outlined,
-                    size: 40,
-                    color: Colors.white,
-                  ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(32.0),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey.shade900.withOpacity(0.5) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
+                  style: BorderStyle.solid,
+                  width: 2,
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Drag and drop your CSV file here',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: isDarkMode ? Colors.white70 : Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'or',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.white54 : Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _pickFile,
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 5,
-                    shadowColor: Colors.black.withOpacity(0.4),
-                  ),
-                  child: Ink(
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF2645E5), Color(0xFF7D0BDB)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                        colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6A11CB).withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'Browse Files',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                    child: const Icon(
+                      Icons.cloud_upload_outlined,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Drag and drop your CSV file here',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: isDarkMode ? Colors.white70 : Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'or',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isDarkMode ? Colors.white54 : Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _pickFile,
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 5,
+                      shadowColor: Colors.black.withOpacity(0.4),
+                    ),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2645E5), Color(0xFF7D0BDB)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Browse Files',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                if (_selectedFile != null) ...[
+                  if (_selectedFile != null) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      'Selected: ${_selectedFile!.name}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Text(
-                    'Selected: ${_selectedFile!.name}',
+                    'Maximum file size: 10MB',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontStyle: FontStyle.italic,
-                      color: isDarkMode ? Colors.white70 : Colors.black87,
+                      fontSize: 14,
+                      color: isDarkMode ? Colors.white54 : Colors.black54,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ],
-                const SizedBox(height: 20),
-                Text(
-                  'Maximum file size: 10MB',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.white54 : Colors.black54,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           const Spacer(),

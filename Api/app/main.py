@@ -3,6 +3,7 @@ from starlette.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 import os
+import uvicorn
 
 # Create necessary directories on startup
 os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
@@ -19,10 +20,10 @@ app = FastAPI(
 # CORS (Cross-Origin Resource Sharing)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=settings.ALLOWED_ORIGINS, # e.g., ["https://your-flutter-app.com", "http://localhost:8080"]
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include the main API router
@@ -35,3 +36,5 @@ def read_root():
     """
     return {"message": f"Welcome to the {settings.PROJECT_NAME}! Visit /docs for documentation."}
 
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

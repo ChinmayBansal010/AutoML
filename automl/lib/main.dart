@@ -4,9 +4,9 @@ import 'package:automl/screens/auth/auth_wrapper.dart';
 import 'package:automl/screens/auth/login_screen.dart';
 import 'package:automl/screens/auth/signup_screen.dart';
 import 'package:automl/screens/dashboard_screen.dart';
-// 1. Import the new screen
 import 'package:automl/screens/job/job_creation/job_creation_screen.dart';
-
+import 'package:automl/screens/job/results_screen.dart';
+import 'package:automl/screens/job/training_progress_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,7 +76,26 @@ class MyAppState extends State<MyApp> {
         SignupScreen.routeName: (context) => const SignupScreen(),
         DashboardScreen.routeName: (context) => const DashboardScreen(),
         JobCreationScreen.routeName: (context) => const JobCreationScreen(),
+
+        // --- THIS IS THE FIX: ADDED SAFE ARGUMENT HANDLING ---
+        TrainingProgressScreen.routeName: (context) {
+          final args = ModalRoute.of(context)!.settings.arguments;
+          if (args is String) {
+            return TrainingProgressScreen(taskId: args);
+          }
+          // Return a fallback error screen if arguments are missing/wrong
+          return const Scaffold(body: Center(child: Text('Error: Task ID missing')));
+        },
+        ResultsScreen.routeName: (context) {
+          final args = ModalRoute.of(context)!.settings.arguments;
+          if (args is Map<String, dynamic>) {
+            return ResultsScreen(resultsData: args);
+          }
+          // Return a fallback error screen
+          return const Scaffold(body: Center(child: Text('Error: Results data missing')));
+        },
       },
     );
   }
 }
+

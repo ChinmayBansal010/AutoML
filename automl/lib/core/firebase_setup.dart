@@ -17,12 +17,27 @@ Future<void> initializeFirebase() async {
 
 Future<String?> signUp(String email, String password) async {
   try {
-    await auth.createUserWithEmailAndPassword(email: email, password: password);
-    return null;
+    // 1. Create the user in Firebase Authentication
+    final userCredential = await auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final user = userCredential.user;
+    if (user != null) {
+      // 2. Create a corresponding document in the 'users' collection
+      await db.collection('users').doc(user.uid).set({
+        'email': user.email,
+        'createdAt': FieldValue.serverTimestamp(),
+        'displayName': '',
+      });
+    }
+
+    return null; // Success
   } on FirebaseAuthException catch (e) {
-    return e.message;
+    return e.message; // Return Firebase Auth specific errors
   } catch (e) {
-    return 'An unknown error occurred.';
+    return 'An unknown error occurred.'; // Return generic errors
   }
 }
 
