@@ -32,7 +32,9 @@ def create_preprocessing_pipeline(
     # Pipeline for categorical features:
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy=config.categorical_imputation)),
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+        # --- THIS IS THE FIX ---
+        # Added sparse_output=False to prevent the ValueError with pandas output
+        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
     ])
 
     # --- Combine transformers into a single preprocessor object ---
@@ -45,4 +47,3 @@ def create_preprocessing_pipeline(
     )
 
     return preprocessor
-

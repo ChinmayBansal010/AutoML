@@ -1,10 +1,9 @@
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import pandas as pd
 import shap
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder
@@ -14,60 +13,52 @@ import catboost as cb
 import os
 import numpy as np
 import re
-import seaborn as sns
+import json
 
 from app.pipelines.data_pipeline import create_preprocessing_pipeline
 from app.schemas.model import PreprocessingConfig
 
+def _clean_for_json(obj):
+    if isinstance(obj, dict):
+        return {str(k): _clean_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_clean_for_json(v) for v in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
 MODELS = {
-    "random_forest": lambda: RandomForestClassifier(random_state=42), 
-    "xgboost": lambda: xgb.XGBClassifier(random_state=42),
-    "lightgbm": lambda: lgb.LGBMClassifier(random_state=42, verbose=-1), 
-    "catboost": lambda: cb.CatBoostClassifier(random_state=42, verbose=0), 
-    "logistic_regression": lambda: LogisticRegression(max_iter=1000, random_state=42), 
+    "random_forest": lambda: RandomForestClassifier(random_state=42),
+    "xgboost": lambda: xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='mlogloss'),
+    "lightgbm": lambda: lgb.LGBMClassifier(random_state=42, verbose=-1),
+    "catboost": lambda: cb.CatBoostClassifier(random_state=42, verbose=0),
+    "logistic_regression": lambda: LogisticRegression(max_iter=1000, random_state=42),
 }
 
 PARAM_GRIDS = {
-    "random_forest": {
-        'n_estimators': [100, 200],
-        'max_depth': [10, 20, None],
-    },
-    "logistic_regression": {
-        'C': [0.1, 1.0, 10.0],
-        'solver': ['liblinear']
-    },
-    "xgboost": {
-        'n_estimators': [100, 200],
-        'max_depth': [3, 5],
-        'learning_rate': [0.05, 0.1]
-    },
-    "lightgbm": {
-        'n_estimators': [100, 200],
-        'num_leaves': [20, 31, 40],
-        'min_child_samples': [10, 20, 50], 
-        'min_split_gain': [0.0, 0.1]
-    },
-    "catboost": {
-        'iterations': [100, 200],
-        'depth': [4, 6]
-    }
+    "random_forest": {'n_estimators': [100, 200], 'max_depth': [10, 20, None]},
+    "logistic_regression": {'C': [0.1, 1.0, 10.0], 'solver': ['liblinear']},
+    "xgboost": {'n_estimators': [100, 200], 'max_depth': [3, 5], 'learning_rate': [0.05, 0.1]},
+    "lightgbm": {'n_estimators': [100, 200], 'num_leaves': [20, 31, 40]},
+    "catboost": {'iterations': [100, 200], 'depth': [4, 6]}
 }
 
 def _sanitize_feature_names(df: pd.DataFrame) -> pd.DataFrame:
     new_columns = {}
     for col in df.columns:
-        sanitized_col = re.sub('[^A-Za-z0-9_]+', '_', col)
+        sanitized_col = re.sub(r'[^A-Za-z0-9_]+', '_', str(col))
         if re.match(r'^\d', sanitized_col):
             sanitized_col = f'col_{sanitized_col}'
         new_columns[col] = sanitized_col
     return df.rename(columns=new_columns)
 
-def _get_confusion_matrix_data(y_test_encoded, y_pred_encoded, class_labels):
-    cm = confusion_matrix(y_test_encoded, y_pred_encoded)
-    return {
-        "labels": class_labels,
-        "matrix": cm.tolist()
-    }
+def _get_confusion_matrix_data(y_test_encoded, y_pred_encoded, class_labels, present_labels):
+    cm = confusion_matrix(y_test_encoded, y_pred_encoded, labels=present_labels)
+    return {"labels": class_labels, "matrix": cm.tolist()}
 
 def _get_shap_summary_data(model, X_test_processed, model_name):
     try:
@@ -76,24 +67,17 @@ def _get_shap_summary_data(model, X_test_processed, model_name):
         elif model_name == "logistic_regression":
             explainer = shap.LinearExplainer(model, X_test_processed)
         else:
-            return None 
-
+            return None
         shap_values = explainer.shap_values(X_test_processed)
         feature_names = X_test_processed.columns.tolist()
-
         if isinstance(shap_values, list):
-            mean_abs_shap = np.mean(np.abs(np.stack(shap_values, axis=-1)), axis=(0, 2)).tolist()
+            mean_abs_shap = np.mean(np.abs(np.stack(shap_values, axis=-1)), axis=(0, 2))
         else:
-            mean_abs_shap = np.mean(np.abs(shap_values), axis=0).tolist()
-        
-        return {
-            "feature_names": feature_names,
-            "mean_abs_shap_values": mean_abs_shap
-        }
+            mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
+        return {"feature_names": feature_names, "mean_abs_shap_values": mean_abs_shap.tolist()}
     except Exception as e:
-        print(f"SHAP calculation failed: {e}")
+        print(f"SHAP calculation failed for {model_name}: {e}")
         return None
-
 
 def run_training_pipeline(
     df: pd.DataFrame,
@@ -104,111 +88,96 @@ def run_training_pipeline(
     plots_dir: str,
     hyperparameter_tuning: bool = False
 ) -> dict:
-    
-    if model_name not in MODELS:
-        raise ValueError(f"Unsupported model: {model_name}")
 
-    cols_to_drop = ['track_id', 'artists', 'album_name', 'track_name']
-    df = df.drop(columns=[col for col in cols_to_drop if col in df.columns])
+    high_cardinality_cols = []
+    for col in df.select_dtypes(include=['object', 'category']).columns:
+        if col != target_column and df[col].nunique() / len(df) > 0.95:
+            high_cardinality_cols.append(col)
+    
+    if high_cardinality_cols:
+        df = df.drop(columns=high_cardinality_cols)
+
+    if df[target_column].isnull().any():
+        df.dropna(subset=[target_column], inplace=True)
+        df.reset_index(drop=True, inplace=True)
 
     X = df.drop(columns=[target_column])
     y = df[target_column]
     
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
-    class_labels = label_encoder.classes_.tolist()
+    num_classes = len(label_encoder.classes_)
     
     try:
         X_train, X_test, y_train_encoded, y_test_encoded = train_test_split(
-            X, y_encoded, test_size=test_size, random_state=42, stratify=y_encoded
-        )
+            X, y_encoded, test_size=test_size, random_state=42, stratify=y_encoded)
     except ValueError:
         print("Stratified split failed. Falling back to a standard split.")
         X_train, X_test, y_train_encoded, y_test_encoded = train_test_split(
             X, y_encoded, test_size=test_size, random_state=42
         )
 
-    numeric_cols = X_train.select_dtypes(include=['number']).columns.tolist()
-    categorical_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
+    numeric_cols = X_train.select_dtypes(include=np.number).columns.tolist()
+    categorical_cols = X_train.select_dtypes(exclude=np.number).columns.tolist()
     
     preprocessor = create_preprocessing_pipeline(numeric_cols, categorical_cols, preprocessing_config)
-    
-    try:
-        preprocessor.set_output(transform="pandas")
-    except AttributeError:
-        pass
+    preprocessor.set_output(transform="pandas")
     
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
     
-    X_train_processed = _sanitize_feature_names(X_train_processed)
-    X_test_processed = _sanitize_feature_names(X_test_processed)
+    X_train_processed = _sanitize_feature_names(X_train_processed).astype(np.float64)
+    X_test_processed = _sanitize_feature_names(X_test_processed).astype(np.float64)
+
+    # --- THIS IS THE ROBUST XGBOOST FIX ---
+    base_model = MODELS[model_name]()
+    if model_name == "xgboost":
+        # Explicitly set the number of classes for XGBoost
+        base_model.set_params(num_class=num_classes)
     
-    X_train_processed = X_train_processed.astype(np.float64)
-    X_test_processed = X_test_processed.astype(np.float64)
-
-    model_class = MODELS[model_name]
-    base_model = model_class()
-
-    final_params = None
-
+    model = base_model
     if hyperparameter_tuning and model_name in PARAM_GRIDS:
-        print(f"Starting hyperparameter tuning for {model_name}...")
         grid_search = GridSearchCV(base_model, PARAM_GRIDS[model_name], cv=3, scoring='accuracy', n_jobs=-1, error_score='raise')
         grid_search.fit(X_train_processed, y_train_encoded)
         model = grid_search.best_estimator_
-        final_params = model.get_params()
-        print(f"Best parameters found for {model_name}: {grid_search.best_params_}")
     else:
-        print(f"Starting standard training for {model_name}...")
-        model = base_model
         model.fit(X_train_processed, y_train_encoded)
-        final_params = model.get_params()
-
+    
     y_pred_encoded = model.predict(X_test_processed)
     
-    report = classification_report(y_test_encoded, y_pred_encoded, target_names=class_labels, output_dict=True, zero_division=0)
+    present_labels = np.union1d(y_test_encoded, y_pred_encoded)
+    target_names_present = label_encoder.inverse_transform(present_labels)
+
+    report = classification_report(
+        y_test_encoded, y_pred_encoded, 
+        labels=present_labels, target_names=target_names_present, 
+        output_dict=True, zero_division=0
+    )
     
+    # --- THIS FIX ensures 'accuracy' is always present ---
+    overall_metrics = report.get('weighted avg', {})
+    if 'accuracy' in report:
+        overall_metrics['accuracy'] = report['accuracy']
+
     metrics = {
-        "overall_metrics": {
-            "accuracy": report['accuracy'],
-            "weighted_precision": report['weighted avg']['precision'],
-            "weighted_recall": report['weighted avg']['recall'],
-            "weighted_f1_score": report['weighted avg']['f1-score'],
-            "macro_precision": report['macro avg']['precision'],
-            "macro_recall": report['macro avg']['recall'],
-            "macro_f1_score": report['macro avg']['f1-score'],
-        },
-        "per_class_metrics": { 
-            cls: {
-                "precision": report[cls]['precision'],
-                "recall": report[cls]['recall'],
-                "f1_score": report[cls]['f1-score'],
-                "support": report[cls]['support']
-            }
-            for cls in class_labels
-        },
-        "target_classes": class_labels, 
-        "confusion_matrix": confusion_matrix(y_test_encoded, y_pred_encoded).tolist()
+        "overall_metrics": overall_metrics,
+        "per_class_metrics": {cls: report.get(cls, {}) for cls in target_names_present},
+        "confusion_matrix": confusion_matrix(y_test_encoded, y_pred_encoded, labels=present_labels).tolist()
     }
     
-    plots = {}
-    plots["confusion_matrix"] = _get_confusion_matrix_data(y_test_encoded, y_pred_encoded, class_labels)
-    plots["shap_summary"] = _get_shap_summary_data(model, X_test_processed, model_name)
+    plots = {
+        "confusion_matrix": _get_confusion_matrix_data(y_test_encoded, y_pred_encoded, target_names_present.tolist(), present_labels),
+        "shap_summary": _get_shap_summary_data(model, X_test_processed, model_name)
+    }
 
     details = {
-        "model_parameters": final_params,
+        "model_parameters": {k: str(v) for k, v in model.get_params().items()},
         "preprocessing_config": preprocessing_config.dict(),
         "n_features_used": X_train_processed.shape[1],
-        "n_train_samples": len(y_train_encoded),
-        "n_test_samples": len(y_test_encoded),
         "target_column": target_column,
-        "original_class_distribution": y.value_counts().to_dict()
+        "target_classes": label_encoder.classes_.tolist()
     }
-
-    return {
-        "model": model,
-        "metrics": metrics,
-        "plots": plots,
-        "details": details
-    }
+    return _clean_for_json({
+        "model": model, "metrics": metrics,
+        "plots": plots, "details": details
+    })
