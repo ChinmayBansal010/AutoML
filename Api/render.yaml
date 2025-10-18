@@ -5,16 +5,19 @@ services:
     repo: https://github.com/ChinmayBansal010/AutoML
     region: singapore
     plan: free
-    dockerfilePath: ./Api/Dockerfile
+    
+    # This is the key change:
+    rootDir: Api # Tells Render to look inside the 'Api' folder
+    
+    # The path is now relative to the rootDir
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /
-
+    
     envVars:
       - key: STORAGE_DIR
         value: /var/data/automl_storage
-
-    # Disks go **outside** of envVars and are directly nested under the service
+        
     disk:
       name: automl-storage
       mountPath: /var/data/automl_storage
       sizeGB: 1
-      
