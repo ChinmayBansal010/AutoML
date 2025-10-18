@@ -43,6 +43,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           return accuracyB.compareTo(accuracyA);
         });
       _bestModel = _rankedModels.first;
+      // Start the save process
       _saveResultsToFirebase();
     } else {
       _rankedModels = [];
@@ -61,6 +62,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
         // This is the nested list we need to fix.
         final Map<String, dynamic> listAsMap = {};
         for (int i = 0; i < value.length; i++) {
+          // Flatten the inner list to a string or ensure it's a valid list of primitives if needed
+          // Assuming inner list contains primitives that Firestore supports directly in a list.
           listAsMap['row_$i'] = value[i];
         }
         sanitizedMap[key] = listAsMap;
@@ -82,18 +85,39 @@ class _ResultsScreenState extends State<ResultsScreen> {
       return;
     }
 
+    final firestore = FirebaseFirestore.instance;
+    // REVERTED FIX 1 & 2: Use standard 'users' collection path
+    final jobRef = firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('jobs')
+        .doc(taskId);
+
+    // FIX 3: Check if the job already exists
+    final jobSnapshot = await jobRef.get();
+
+    if (jobSnapshot.exists) {
+      // If the job document already exists, we stop here. Do not increment counters again.
+      debugPrint("Job $taskId already exists in Firestore. Skipping save/increment.");
+      return;
+    }
+
+
+    // --- Only run this section if the job is NEW ---
+
     // Sanitize the entire data map before saving.
     final Map<String, dynamic> dataToSave = _sanitizeDataForFirestore(widget.resultsData);
 
-    final firestore = FirebaseFirestore.instance;
     final batch = firestore.batch();
 
+    // REVERTED FIX 4: Use standard 'users' collection path for the dashboard summary
     final summaryRef = firestore
         .collection('users')
         .doc(user.uid)
         .collection('dashboard')
         .doc('summary');
 
+    // 1. Update the Summary Document (Only for new jobs)
     batch.set(
       summaryRef,
       {
@@ -103,13 +127,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       SetOptions(merge: true),
     );
 
-    final jobRef = firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('jobs')
-        .doc(taskId);
-
-    // Save the clean, sanitized data.
+    // 2. Save the Job Data Document (Only for new jobs)
     batch.set(jobRef, {
       'taskId': taskId,
       'status': 'Completed',
@@ -119,7 +137,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
     try {
       await batch.commit();
-      showCustomSnackbar(context,"Successfully saved results for task $taskId for user ${user.uid}.");
+      showCustomSnackbar(context,"Successfully saved new results for task $taskId for user ${user.uid}.");
     } catch (e) {
       showCustomSnackbar(context,"Error saving results to Firebase: $e");
     }
@@ -246,7 +264,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -321,7 +339,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                             String metricName = _metricColors.keys.elementAt(rodIndex);
                             return BarTooltipItem(
                               '$modelName\n',
-                              TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                               children: <TextSpan>[
                                 TextSpan(
                                   text: '${metricName.capitalizeFirst}: ${(rod.toY * 100).toStringAsFixed(1)}%',
@@ -378,7 +396,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         horizontalInterval: 0.2,
                         checkToShowHorizontalLine: (value) => value % 0.2 == 0,
                         getDrawingHorizontalLine: (value) => FlLine(
-                          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                          color: Theme.of(context).dividerColor.withOpacity(0.5),
                           strokeWidth: 0.8,
                         ),
                       ),
@@ -460,7 +478,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
               label: const Text('Model'),
               onPressed: () => apiService.downloadModel(modelData['model_id']),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Theme.of(context).primaryColor.withValues(alpha: 0.5)),
+                side: BorderSide(color: Theme.of(context).primaryColor.withOpacity(0.5)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
             ),

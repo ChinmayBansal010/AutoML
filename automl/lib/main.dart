@@ -7,6 +7,7 @@ import 'package:automl/screens/dashboard_screen.dart';
 import 'package:automl/screens/job/job_creation/job_creation_screen.dart';
 import 'package:automl/screens/job/results_screen.dart';
 import 'package:automl/screens/job/training_progress_screen.dart';
+import 'package:automl/screens/profile_screen.dart'; // NEW: Import ProfileScreen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,8 +77,8 @@ class MyAppState extends State<MyApp> {
         SignupScreen.routeName: (context) => const SignupScreen(),
         DashboardScreen.routeName: (context) => const DashboardScreen(),
         JobCreationScreen.routeName: (context) => const JobCreationScreen(),
+        ProfileScreen.routeName: (context) => const ProfileScreen(), // NEW: Profile Screen Route
 
-        // --- THIS IS THE FIX: ADDED SAFE ARGUMENT HANDLING ---
         TrainingProgressScreen.routeName: (context) {
           final args = ModalRoute.of(context)!.settings.arguments;
           if (args is String) {
@@ -98,4 +99,3 @@ class MyAppState extends State<MyApp> {
     );
   }
 }
-
