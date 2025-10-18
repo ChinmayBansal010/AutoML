@@ -211,7 +211,7 @@ class _DataPreviewStepState extends State<DataPreviewStep> {
     final typeName = isNumeric ? 'Numeric' : 'Categorical';
 
     return Chip(
-      backgroundColor: isDarkMode ? color.withOpacity(0.3) : color.withOpacity(0.8),
+      backgroundColor: isDarkMode ? color.withValues(alpha: 0.3) : color.withValues(alpha: 0.8),
       side: BorderSide.none,
       label: Text.rich(
         TextSpan(

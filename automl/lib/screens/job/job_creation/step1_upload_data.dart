@@ -74,7 +74,7 @@ class _UploadDataStepState extends State<UploadDataStep> {
               width: double.infinity,
               padding: const EdgeInsets.all(32.0),
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade900.withOpacity(0.5) : Colors.grey.shade100,
+                color: isDarkMode ? Colors.grey.shade900.withValues(alpha: 0.5) : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
                   color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
@@ -96,7 +96,7 @@ class _UploadDataStepState extends State<UploadDataStep> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6A11CB).withOpacity(0.4),
+                          color: const Color(0xFF6A11CB).withValues(alpha: 0.4),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -134,7 +134,7 @@ class _UploadDataStepState extends State<UploadDataStep> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                       elevation: 5,
-                      shadowColor: Colors.black.withOpacity(0.4),
+                      shadowColor: Colors.black.withValues(alpha: 0.4),
                     ),
                     child: Ink(
                       decoration: BoxDecoration(

@@ -118,7 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   elevation: 5,
-                  shadowColor: Colors.black.withOpacity(0.4),
+                  shadowColor: Colors.black.withValues(alpha: 0.4),
                 ),
                 child: Ink(
                   decoration: BoxDecoration(
@@ -387,7 +387,7 @@ class StatCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.9),
+                    color: iconColor.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -406,7 +406,7 @@ class StatCard extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isDarkMode
-                      ? Colors.white.withOpacity(0.9)
+                      ? Colors.white.withValues(alpha: 0.9)
                       : Colors.black87,
                 ),
                 textScaler: const TextScaler.linear(2.2),

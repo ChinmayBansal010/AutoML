@@ -418,7 +418,7 @@ class _DataVisualizationStepState extends State<DataVisualizationStep> {
                   yValues[i].toDouble(),
                   dotPainter: FlDotCirclePainter(
                     radius: 3,
-                    color: Colors.blue.withOpacity(0.7),
+                    color: Colors.blue.withValues(alpha: 0.7),
                     strokeWidth: 0,
                   ),
                 ),

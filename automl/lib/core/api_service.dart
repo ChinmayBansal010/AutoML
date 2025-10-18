@@ -12,30 +12,33 @@ class ApiService {
   Future<Map<String, dynamic>?> uploadFile(PlatformFile file, BuildContext context) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/upload');
-      print('Attempting to upload to: $uri');
       final request = http.MultipartRequest('POST', uri);
       request.headers['X-API-KEY'] = 'VTDzdjjDdQMx6ZvhA8MUNYrhtgH7vv64D2pzBmZD13CNGeZQj4GW4kfUvNGWz72D';
       if (kIsWeb) {
-        print('Uploading from web with bytes...'); // <-- LOG 2
         request.files.add(http.MultipartFile.fromBytes('file', file.bytes!, filename: file.name));
       } else {
-        print('Uploading from mobile with path: ${file.path}'); // <-- LOG 3
         request.files.add(await http.MultipartFile.fromPath('file', file.path!, filename: file.name));
       }
 
       final response = await http.Response.fromStream(await request.send());
 
-      print('Response Status Code: ${response.statusCode}');
-
       if (response.statusCode == 200) {
-        showCustomSnackbar(context, 'File uploaded successfully.');
+        if(context.mounted) {
+          showCustomSnackbar(context, 'File uploaded successfully.');
+        }
         return json.decode(response.body);
       } else {
-        showCustomSnackbar(context, 'File upload failed: ${response.body}', isError: true);
+        if(context.mounted) {
+          showCustomSnackbar(
+              context, 'File upload failed: ${response.body}', isError: true);
+        }
         return null;
       }
     } catch (e) {
-      showCustomSnackbar(context, 'An error occurred during upload: $e', isError: true);
+      if(context.mounted) {
+        showCustomSnackbar(
+            context, 'An error occurred during upload: $e', isError: true);
+      }
       return null;
     }
   }
@@ -48,11 +51,18 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        showCustomSnackbar(context, 'Failed to load data preview: ${response.body}', isError: true);
+        if(context.mounted) {
+          showCustomSnackbar(
+              context, 'Failed to load data preview: ${response.body}',
+              isError: true);
+        }
         return null;
       }
     } catch (e) {
-      showCustomSnackbar(context, 'An error occurred fetching preview: $e', isError: true);
+      if(context.mounted) {
+        showCustomSnackbar(
+            context, 'An error occurred fetching preview: $e', isError: true);
+      }
       return null;
     }
   }
@@ -64,11 +74,17 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        showCustomSnackbar(context, 'Failed to get visualization data: ${json.decode(response.body)['detail']}', isError: true);
+        if(context.mounted) {
+          showCustomSnackbar(context,
+              'Failed to get visualization data: ${json.decode(
+                  response.body)['detail']}', isError: true);
+        }
         return null;
       }
     } catch (e) {
-      showCustomSnackbar(context, 'An error occurred: $e', isError: true);
+      if(context.mounted) {
+        showCustomSnackbar(context, 'An error occurred: $e', isError: true);
+      }
       return null;
     }
   }
@@ -88,11 +104,17 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        showCustomSnackbar(context, 'Failed to start training: ${response.body}', isError: true);
+        if(context.mounted) {
+          showCustomSnackbar(
+              context, 'Failed to start training: ${response.body}',
+              isError: true);
+        }
         return null;
       }
     } catch (e) {
-      showCustomSnackbar(context, 'An error occurred: $e', isError: true);
+      if(context.mounted) {
+        showCustomSnackbar(context, 'An error occurred: $e', isError: true);
+      }
       return null;
     }
   }
@@ -103,12 +125,17 @@ class ApiService {
       final response = await http.get(uri);
       if (response.statusCode == 200) {
         return json.decode(response.body);
-      } else if (response.statusCode != 404) { // Don't show snackbar for "not found" during initial polling
-        showCustomSnackbar(context, 'Failed to get status: ${response.body}', isError: true);
+      } else if (response.statusCode != 404) {
+        if(context.mounted) {
+          showCustomSnackbar(
+              context, 'Failed to get status: ${response.body}', isError: true);
+        }
       }
       return null;
     } catch (e) {
-      showCustomSnackbar(context, 'An error occurred: $e', isError: true);
+      if(context.mounted) {
+        showCustomSnackbar(context, 'An error occurred: $e', isError: true);
+      }
       return null;
     }
   }
