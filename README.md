@@ -1,6 +1,6 @@
 This is a comprehensive project spanning a Python **FastAPI backend** and a Flutter **mobile/web frontend** for a machine learning automation service. A strong README will highlight the full stack and the ML capabilities.
 
-Here is a structured [`README.md`](http://README.md) file for your project:
+Here is a structured [`README.md`](https://github.com/ChinmayBansal010/AutoML/blob/main/README.md) file for your project:
 
 ---
 
