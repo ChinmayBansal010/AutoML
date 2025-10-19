@@ -14,9 +14,9 @@ This project provides a complete, end-to-end solution for automating data analys
 
 A quick walkthrough of **AutoML** in action — from uploading data to automated training.
 
-<video src="https://github.com/ChinmayBansal010/AutoML/raw/main/assets/demo.mp4" width="400" controls>
-  Your browser does not support the video tag.
-</video>
+<a href="https://github.com/ChinmayBansal010/AutoML/raw/main/assets/demo.mp4">
+  <img src="https://github.com/ChinmayBansal010/AutoML/raw/main/assets/demo_thumbnail.png" alt="AutoML Demo" width="300">
+</a>
 
 > 🎬 Click the image to watch the demo (MP4 hosted in repo).
 
