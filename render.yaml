@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: automl-api
+    runtime: docker
+    repo: https://github.com/ChinmayBansal010/AutoML
+    region: singapore
+    plan: free
+    
+    # This is the key change:
+    rootDir: Api # Tells Render to look inside the 'Api' folder
+    
+    # The path is now relative to the rootDir
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    
+    envVars:
+      - key: API_KEY
+        value: "" 
+      - key: BLOB_READ_WRITE_TOKEN
+        value: "" 
+      - key: REDIS_URL
+        value: "" 
