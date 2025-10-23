@@ -10,6 +10,16 @@ Here is a structured [`README.md`](https://github.com/ChinmayBansal010/AutoML/bl
 
 This project provides a complete, end-to-end solution for automating data analysis and machine learning model training. Users can upload their datasets via a sleek mobile/web app, analyze the data, trigger automated model training, and retrieve model performance results—all through a robust, containerized API.
 
+## 🎥 Demo
+
+A quick walkthrough of **AutoML** in action — from uploading data to automated training.
+
+<a href="https://github.com/ChinmayBansal010/AutoML/raw/main/assets/demo.mp4">
+  <img src="https://github.com/ChinmayBansal010/AutoML/raw/main/assets/demo_thumbnail.png" alt="AutoML Demo" width="300">
+</a>
+
+> 🎬 Click the image to watch the demo (MP4 hosted in repo).
+
 ## 🌟 Features
 
 ### Frontend (Flutter)
