@@ -14,9 +14,12 @@ services:
     healthCheckPath: /
     
     envVars:
-      - key: STORAGE_DIR
-        value: /var/data/automl_storage
-        
+      - key: API_KEY
+        value: "" 
+      - key: BLOB_READ_WRITE_TOKEN
+        value: "" 
+      - key: REDIS_URL
+        value: "" 
     disk:
       name: automl-storage
       mountPath: /var/data/automl_storage

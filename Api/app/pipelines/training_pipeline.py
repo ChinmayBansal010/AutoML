@@ -85,7 +85,7 @@ def run_training_pipeline(
     model_name: str,
     preprocessing_config: PreprocessingConfig,
     test_size: float,
-    plots_dir: str,
+    # plots_dir: str,
     hyperparameter_tuning: bool = False
 ) -> dict:
 
