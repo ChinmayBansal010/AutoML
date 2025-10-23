@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     REDIS_URL: str # <-- This is the variable Vercel provided
 
     # --- MODEL & TRAINING CONFIGURATIONS ---
-    SUPPORTED_MODELS: List[str] = ["random_forest", "xgboost", "lightgbm", "catboost", "logistic_regression"]
+    SUPPORTED_MODELS: List[str] = ["random_forest", "logistic_regression", "decision_tree"]
     DEFAULT_TEST_SIZE: float = 0.2
 
     model_config = SettingsConfigDict(

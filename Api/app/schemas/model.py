@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 # Defines the configuration for data preprocessing steps
 class PreprocessingConfig(BaseModel):
@@ -26,14 +26,26 @@ class TaskResponse(BaseModel):
     task_id: str
     status: str
 
+# --- UPDATED SCHEMAS ---
+
+# Specific schema for the confusion matrix plot data
+class ConfusionMatrixPlot(BaseModel):
+    labels: List[str]
+    matrix: List[List[int]]
+
+# Specific schema for all plot data
+class PlotData(BaseModel):
+    confusion_matrix: ConfusionMatrixPlot
+    shap_summary: Optional[Dict[str, Any]] = None # Kept as None since it was removed
+
 # Defines the result structure for a single trained model
 class ModelResult(BaseModel):
     model_id: str
     metrics: Dict
     details: Dict
-    plots: Dict
+    plots: PlotData  # <-- Updated from simple Dict
 
-# Defines the status of a background training task, capable of holding multiple model results
+# Defines the status of a background training task
 class StatusResponse(BaseModel):
     task_id: str
     status: str

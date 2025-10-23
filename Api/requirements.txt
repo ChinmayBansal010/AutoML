@@ -9,10 +9,10 @@ python-multipart
 # --- Data & ML ---
 pandas
 scikit-learn
-xgboost
-lightgbm
-catboost
-shap
+# xgboost
+# lightgbm
+# catboost
+# shap
 joblib
 openpyxl  # Needed for pandas.read_excel()
 
