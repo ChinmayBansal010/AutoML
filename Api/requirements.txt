@@ -1,6 +1,7 @@
 # --- Core API ---
 fastapi
 uvicorn
+gunicorn
 pydantic-settings
 python-dotenv
 python-multipart

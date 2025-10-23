@@ -20,7 +20,3 @@ services:
         value: "" 
       - key: REDIS_URL
         value: "" 
-    disk:
-      name: automl-storage
-      mountPath: /var/data/automl_storage
-      sizeGB: 1
