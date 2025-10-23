@@ -5,11 +5,11 @@ from app.core.config import settings
 import os
 import uvicorn
 
-# Create necessary directories on startup
-os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
-os.makedirs(settings.REPORTS_DIR, exist_ok=True)
-os.makedirs(settings.MODELS_DIR, exist_ok=True)
-os.makedirs(settings.TASK_STATUS_DIR, exist_ok=True)
+# # Create necessary directories on startup
+# os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
+# os.makedirs(settings.REPORTS_DIR, exist_ok=True)
+# os.makedirs(settings.MODELS_DIR, exist_ok=True)
+# os.makedirs(settings.TASK_STATUS_DIR, exist_ok=True)
 
 
 app = FastAPI(
