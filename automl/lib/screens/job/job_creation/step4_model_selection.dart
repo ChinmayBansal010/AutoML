@@ -15,9 +15,7 @@ class _ModelSelectionStepState extends State<ModelSelectionStep> {
   final Map<String, IconData> _availableModels = {
     'Logistic Regression': Icons.linear_scale,
     'Random Forest': Icons.park_outlined,
-    'XGBoost': Icons.flash_on,
-    'LightGBM': Icons.speed,
-    'CatBoost': Icons.pets,
+    'Decision Tree': Icons.account_tree_outlined,
   };
 
   void _toggleModel(String modelKey) {

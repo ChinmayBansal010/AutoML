@@ -1,54 +1,76 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-# Defines the configuration for data preprocessing steps
 class PreprocessingConfig(BaseModel):
-    numeric_imputation: str = "median"
-    categorical_imputation: str = "most_frequent"
-    scaling_strategy: str = "standard_scaler"
+    """
+    Configuration for data preprocessing steps.
+    """
+    numeric_imputation: str = Field(default="mean", description="Strategy for handling missing numeric values: mean, median, most_frequent")
+    categorical_imputation: str = Field(default="most_frequent", description="Strategy for handling missing categorical values: most_frequent, constant")
+    scaling_strategy: str = Field(default="standard_scaler", description="Scaling strategy for numeric features: standard_scaler, minmax")
+    remove_outliers: bool = Field(default=False, description="Whether to remove outliers")
 
-# Defines the structure of a request to start a training job
+    def dict(self):
+        return {
+            "numeric_imputation": self.numeric_imputation,
+            "categorical_imputation": self.categorical_imputation,
+            "scaling_strategy": self.scaling_strategy,
+            "remove_outliers": self.remove_outliers,
+        }
+
+
 class TrainingRequest(BaseModel):
-    file_id: str
-    target_column: str
-    models: List[str]
-    test_size: float = Field(0.2, ge=0.1, le=0.5)
-    hyperparameter_tuning: bool = False
-    preprocessing_config: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    """
+    Schema for requesting model training with selected models and configuration.
+    """
+    models: List[str] = Field(..., description="List of model types to train")
+    target_column: str = Field(..., description="Target column for training")
+    test_size: float = Field(default=0.2, description="Test set size ratio")
+    file_id: str = Field(..., description="File ID for the training dataset")
+    preprocessing_config: PreprocessingConfig = Field(default_factory=PreprocessingConfig, description="Preprocessing configuration")
+    hyperparameter_tuning: bool = Field(default=False, description="Whether to perform hyperparameter tuning")
 
-# Defines the structure of a request to predict using a trained model
-class PredictionRequest(BaseModel):
-    model_id: str
-    data: List[dict]
 
-# Defines the structure of a response that returns a task ID
 class TaskResponse(BaseModel):
-    task_id: str
-    status: str
+    """
+    Response schema for task creation with task ID and status.
+    """
+    task_id: str = Field(..., description="Unique identifier for the training task")
+    status: str = Field(..., description="Current status of the task")
 
-# --- UPDATED SCHEMAS ---
 
-# Specific schema for the confusion matrix plot data
-class ConfusionMatrixPlot(BaseModel):
-    labels: List[str]
-    matrix: List[List[int]]
-
-# Specific schema for all plot data
-class PlotData(BaseModel):
-    confusion_matrix: ConfusionMatrixPlot
-    shap_summary: Optional[Dict[str, Any]] = None # Kept as None since it was removed
-
-# Defines the result structure for a single trained model
-class ModelResult(BaseModel):
-    model_id: str
-    metrics: Dict
-    details: Dict
-    plots: PlotData  # <-- Updated from simple Dict
-
-# Defines the status of a background training task
 class StatusResponse(BaseModel):
-    task_id: str
-    status: str
-    progress: Optional[str] = None
-    results: Optional[Dict[str, ModelResult]] = None
-    error: Optional[str] = None
+    """
+    Response schema for training status with results and metrics.
+    """
+    task_id: str = Field(..., description="Unique identifier for the training task")
+    status: str = Field(..., description="Current status of the task")
+    progress: Optional[str] = Field(None, description="Progress message")
+    results: Optional[Dict[str, Any]] = Field(None, description="Training results")
+    error: Optional[str] = Field(None, description="Error message if training failed")
+
+
+class ModelResult(BaseModel):
+    """
+    Schema for individual model training results.
+    """
+    model_id: str = Field(..., description="URL to the stored model file")
+    preprocessor_url: str = Field(..., description="URL to the stored preprocessor file")
+    metrics: Dict[str, Any] = Field(..., description="Model performance metrics")
+    plots: Dict[str, Any] = Field(..., description="Visualization data")
+    details: Dict[str, Any] = Field(..., description="Model details and parameters")
+
+
+class PredictionRequest(BaseModel):
+    """
+    Schema for prediction requests with model ID and input features.
+    """
+    model_id: str = Field(..., description="ID of the trained model")
+    data: Dict[str, Any] = Field(..., description="Input data for prediction")
+
+
+class PredictionResponse(BaseModel):
+    """
+    Response schema for predictions.
+    """
+    predictions: List[Any] = Field(..., description="Predicted values or classes")

@@ -6,6 +6,9 @@ pydantic-settings
 python-dotenv
 python-multipart
 
+# --- Firebase ---
+firebase-admin
+
 # --- Data & ML ---
 pandas
 scikit-learn
@@ -14,7 +17,8 @@ scikit-learn
 # catboost
 # shap
 joblib
-openpyxl  # Needed for pandas.read_excel()
+openpyxl
+slowapi
 
 # --- Plotting ---
 matplotlib
@@ -23,3 +27,6 @@ seaborn
 # --- Vercel Services ---
 vercel-blob
 vercel-kv
+
+# --- Redis ---
+redis

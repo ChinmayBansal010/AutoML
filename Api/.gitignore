@@ -31,6 +31,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+firebase_service_account.json
 
 # IDE and editor configuration files
 .idea/

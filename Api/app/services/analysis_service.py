@@ -4,10 +4,10 @@ import math
 from fastapi import Depends
 from app.services.file_service import FileService
 from app.schemas.analysis import AnalysisResponse, ColumnStats
+from app.core.security import get_current_user
 
 
 def safe_float(value):
-    """Convert any non-finite or empty value to None for JSON serialization."""
     try:
         if value in [None, "", " ", "NaN", "nan"]:
             return None
@@ -20,7 +20,6 @@ def safe_float(value):
 
 
 def clean_for_json(obj):
-    """Recursively clean dicts/lists of NaN, inf, or invalid values."""
     if isinstance(obj, dict):
         return {k: clean_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -37,9 +36,6 @@ class AnalysisService:
         self.file_service = file_service
 
     def get_data_preview(self, file_id: str, num_rows: int = 500) -> dict:
-        """
-        Retrieves a DataFrame using the file_id and returns a clean, JSON-safe preview.
-        """
         try:
             df = self.file_service.get_dataframe(file_id)
             if df is None:
@@ -77,9 +73,6 @@ class AnalysisService:
             raise RuntimeError(f"An error occurred during data preview generation: {e}")
 
     def get_visualization_data(self, file_id: str, col1: str, col2: str = None) -> dict:
-        """
-        Generates data for visualization based on selected columns.
-        """
         try:
             df = self.file_service.get_dataframe(file_id)
             if df is None:
@@ -114,9 +107,7 @@ class AnalysisService:
                 }
             
             if col2 and pd.api.types.is_numeric_dtype(df[col1]) and pd.api.types.is_numeric_dtype(df[col2]):
-                # --- THIS IS THE FIX ---
                 clean_scatter_df = df[[col1, col2]].dropna()
-                # Determine sample size based on the *cleaned* dataframe
                 sample_size = min(len(clean_scatter_df), 1000)
                 
                 if sample_size > 0:
@@ -132,9 +123,6 @@ class AnalysisService:
             raise RuntimeError(f"An unexpected error occurred during visualization data generation: {e}")
 
     def generate_eda_report(self, file_id: str, target_column: str = None) -> dict:
-        """
-        Generates a comprehensive EDA report, including specific analysis on the target column if provided.
-        """
         try:
             df = self.file_service.get_dataframe(file_id)
             if df is None:
@@ -148,16 +136,34 @@ class AnalysisService:
 
             column_details = {}
             for col in df.columns:
-                # ... (existing column detail logic remains unchanged)
-                pass
+                col_data = df[col]
+                missing_count = int(col_data.isnull().sum())
+                unique_count = int(col_data.nunique())
+                stats = {
+                    "missing_percentage": round((missing_count / row_count) * 100, 2) if row_count > 0 else 0,
+                    "unique_values": unique_count
+                }
 
-            # --- NEW: Target Column Analysis ---
+                if pd.api.types.is_numeric_dtype(col_data):
+                    stats["type"] = "numeric"
+                    desc = col_data.describe()
+                    stats["mean"] = safe_float(desc.get('mean'))
+                    stats["std"] = safe_float(desc.get('std'))
+                    stats["min"] = safe_float(desc.get('min'))
+                    stats["max"] = safe_float(desc.get('max'))
+                    stats["median"] = safe_float(desc.get('50%'))
+                else:
+                    stats["type"] = "categorical"
+                    top_freq = col_data.value_counts().nlargest(5)
+                    stats["top_values"] = {str(k): int(v) for k, v in top_freq.items()}
+                
+                column_details[col] = ColumnStats(**stats).dict()
+
             target_column_analysis = None
             if target_column and target_column in df.columns:
                 target_data = df[target_column].dropna()
                 
                 if pd.api.types.is_numeric_dtype(target_data):
-                    # Inferred Task: Regression
                     target_column_analysis = {
                         "inferred_task": "Regression",
                         "stats": {
@@ -168,13 +174,11 @@ class AnalysisService:
                         }
                     }
                 else:
-                    # Inferred Task: Classification
                     value_counts = target_data.value_counts()
                     target_column_analysis = {
                         "inferred_task": "Classification",
                         "class_distribution": {str(k): int(v) for k, v in value_counts.items()}
                     }
-            # --- END NEW SECTION ---
 
             visualizations = {}
             
@@ -186,7 +190,7 @@ class AnalysisService:
                 missing_values_total=missing_values_total,
                 summary_stats=column_details,
                 visualizations=visualizations,
-                target_column_analysis=target_column_analysis # Assign the new analysis
+                target_column_analysis=target_column_analysis
             )
 
             return clean_for_json(result.dict())

@@ -1,13 +1,14 @@
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
 from app.services.file_service import FileService
 from app.schemas.upload import UploadResponse
+from app.core.security import get_current_user
 
 router = APIRouter()
 
-@router.post("", response_model=UploadResponse)
+@router.post("", response_model=UploadResponse, dependencies=[Depends(get_current_user)])
 async def upload_file(
     file: UploadFile = File(..., description="The dataset file to upload. Must be .xlsx, .xls, or .csv format."),
-    file_service: FileService = Depends()
+    file_service: FileService = Depends(),
 ):
     """
     Accepts an Excel (.xlsx, .xls) or CSV (.csv) file upload.

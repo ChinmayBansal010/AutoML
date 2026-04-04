@@ -3,23 +3,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 from pathlib import Path
 
+# Use environment variable or relative path (works on Windows and Linux)
+SERVICE_ACCOUNT_KEY_PATH = os.getenv(
+    "FIREBASE_SERVICE_ACCOUNT_FILE",
+    str(Path(__file__).parent.parent.parent / "firebase_service_account.json")
+)
+
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables via a .env file.
     """
     PROJECT_NAME: str = "AutoML API"
     
-    # --- SECURITY SETTINGS ---
-    API_KEY: str 
+    FIREBASE_SERVICE_ACCOUNT_FILE: str = SERVICE_ACCOUNT_KEY_PATH
+    
     ALLOWED_ORIGINS: List[str] = ["*"]
 
-    # --- VERCEL BLOB STORAGE (for large files) ---
     BLOB_READ_WRITE_TOKEN: str
 
-    # --- VERCEL KV (REDIS) (for job status) ---
-    REDIS_URL: str # <-- This is the variable Vercel provided
+    REDIS_URL: str
 
-    # --- MODEL & TRAINING CONFIGURATIONS ---
     SUPPORTED_MODELS: List[str] = ["random_forest", "logistic_regression", "decision_tree"]
     DEFAULT_TEST_SIZE: float = 0.2
 
